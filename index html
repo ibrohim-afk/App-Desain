@@ -1,0 +1,1110 @@
+<!DOCTYPE html>
+<html lang="id" class="scroll-smooth">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Studio Batik (Social Edition)</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Import Map for Three.js Resolution -->
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.module.js",
+                "three/examples/jsm/": "https://cdn.jsdelivr.net/npm/three@0.128.0/examples/jsm/"
+            }
+        }
+    </script>
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700&family=Inter:wght@400;500;700&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Inter', sans-serif; background-color: #FDFDFB; }
+        h1, h2, h3, h4 { font-family: 'Cinzel', serif; }
+        .fabric-bg {
+            background-image: url('data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIyMCIgaGVpZHRoPSIyMCI+CjxyZWN0IHdpZHRoPSIyMCIgaGVpZHRoPSIyMCIgZmlsbD0iI0ZGRkZGRSIgb3BhY2l0eT0iMC4wMiI+PC9yZWN0Pgo8cGF0aCBkPSJNMCAxMEwxMCAyMEwyMCAxMEwxMCAwWiIgZmlsbD0iI2Y5ZjlmOSIgb3BhY2l0eT0iMC4wNSI+PC9wYXRoPgo8L3N2Zz4=');
+            background-color: #FDFDFB;
+        }
+        input[type=range]::-webkit-slider-thumb {
+            -webkit-appearance: none; appearance: none; width: 18px; height: 18px;
+            background: #4338CA; cursor: pointer; border-radius: 50%;
+        }
+        input[type="color"] {
+            -webkit-appearance: none; -moz-appearance: none; appearance: none;
+            width: 100%; height: 40px; padding: 0; border: none;
+            background-color: transparent; cursor: pointer;
+        }
+        input[type="color"]::-webkit-color-swatch-wrapper { padding: 0; }
+        input[type="color"]::-webkit-color-swatch {
+            border: 1px solid #e2e8f0; border-radius: 0.375rem;
+        }
+        .toggle-checkbox:checked { right: 0; border-color: #1E3A8A; }
+        .toggle-checkbox:checked + .toggle-label { background-color: #1E3A8A; }
+        .drawing-tool.active, .tab-btn.active {
+            background-color: #EEF2FF;
+            color: #312E81;
+            box-shadow: inset 0 2px 4px 0 rgba(0, 0, 0, 0.06);
+        }
+        .gallery-item:hover .gallery-overlay { opacity: 1; }
+        
+        .custom-scrollbar::-webkit-scrollbar { width: 6px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: #f1f1f1; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #c7c7c7; border-radius: 3px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #a8a8a8; }
+        
+        .loading-spinner {
+            border: 3px solid #f3f3f3;
+            border-radius: 50%;
+            border-top: 3px solid #4F46E5;
+            width: 24px;
+            height: 24px;
+            -webkit-animation: spin 1s linear infinite;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+
+        #active-stamp-container {
+            position: absolute;
+            cursor: grab;
+            border: 2px dashed #4F46E5;
+            background: rgba(255, 255, 255, 0.1);
+            touch-action: none; 
+            user-select: none;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+        }
+        #active-stamp-container:active {
+            cursor: grabbing;
+            border-color: #4338CA;
+            background: rgba(79, 70, 229, 0.1);
+        }
+        .stamp-active-border { animation: pulse-border 2s infinite; }
+        @keyframes pulse-border { 0% { border-color: #4F46E5; } 50% { border-color: #818CF8; } 100% { border-color: #4F46E5; } }
+    </style>
+</head>
+<body class="fabric-bg text-gray-800 antialiased relative min-h-screen pb-20">
+
+    <main class="max-w-7xl mx-auto py-12 px-6 lg:px-8">
+        <div class="text-center mb-8">
+            <h1 class="text-4xl md:text-6xl font-bold text-indigo-900">Studio Batik Komunitas</h1>
+            <p class="mt-4 text-lg text-gray-600">Desain, Visualisasikan, dan Remix karya komunitas.</p>
+            <div id="auth-status" class="mt-2 text-xs text-indigo-500 font-medium opacity-0 transition-opacity">
+                Menghubungkan ke Cloud...
+            </div>
+        </div>
+        
+        <!-- Tab Navigation -->
+        <div class="mb-8 flex justify-center border-b overflow-x-auto space-x-2">
+            <button id="tab-generator" class="tab-btn active text-lg font-semibold py-4 px-6 -mb-px border-b-2 border-transparent hover:text-indigo-700 whitespace-nowrap">Generator</button>
+            <button id="tab-drawing" class="tab-btn text-lg font-semibold py-4 px-6 -mb-px border-b-2 border-transparent hover:text-indigo-700 whitespace-nowrap">Studio Gambar</button>
+            <button id="tab-mockup" class="tab-btn text-lg font-semibold py-4 px-6 -mb-px border-b-2 border-transparent hover:text-indigo-700 whitespace-nowrap flex items-center gap-2">Mockup 3D</button>
+            <!-- NEW TAB -->
+            <button id="tab-explore" class="tab-btn text-lg font-semibold py-4 px-6 -mb-px border-b-2 border-transparent hover:text-indigo-700 whitespace-nowrap flex items-center gap-2 text-pink-600">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9" />
+                </svg>
+                Jelajahi
+            </button>
+        </div>
+
+        <!-- Generator Section -->
+        <section id="generator-section">
+            <div class="grid lg:grid-cols-12 gap-8">
+                <!-- Generator Controls -->
+                <div class="lg:col-span-4 bg-white p-6 rounded-lg shadow-lg border space-y-4 h-fit">
+                    <div>
+                        <label class="block font-medium mb-2 text-sm text-center">Warna Latar Global</label>
+                        <input id="bg-color-picker" type="color" value="#FEFBEB" class="h-12">
+                    </div>
+                    
+                    <div class="border-b pb-4">
+                        <label class="block font-medium mb-2 text-sm text-center text-gray-700">Aset Kustom (Upload)</label>
+                        <div class="flex justify-center mb-3 bg-gray-100 p-1 rounded-lg">
+                            <button id="mode-trace-btn" class="flex-1 py-1.5 px-2 text-xs font-bold rounded-md bg-white text-indigo-700 shadow-sm transition-all">Hapus Background</button>
+                            <button id="mode-original-btn" class="flex-1 py-1.5 px-2 text-xs font-bold rounded-md text-gray-500 hover:text-gray-700 transition-all">Gambar Asli</button>
+                        </div>
+                        <input type="file" id="motif-upload-input" accept="image/png, image/jpeg, image/svg+xml" class="hidden">
+                        <button id="upload-motif-btn" class="w-full border-2 border-dashed border-gray-300 rounded-lg p-3 text-gray-500 hover:border-indigo-500 hover:text-indigo-600 transition flex flex-col items-center justify-center gap-1 group bg-gray-50">
+                            <div id="upload-btn-content" class="flex flex-col items-center justify-center gap-1">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 group-hover:scale-110 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+                                </svg>
+                                <span class="text-xs font-semibold">Pilih File...</span>
+                                <span id="upload-hint" class="text-[10px] text-gray-400 text-center">Putih jadi Transparan (Bisa diwarnai)</span>
+                            </div>
+                            <div id="upload-loading" class="hidden flex flex-col items-center justify-center gap-2">
+                                <div class="loading-spinner"></div>
+                                <span class="text-xs font-semibold text-indigo-600">Memproses...</span>
+                            </div>
+                        </button>
+                    </div>
+
+                    <div class="space-y-4 max-h-[30rem] overflow-y-auto pr-2 custom-scrollbar">
+                        <div class="border-t pt-4">
+                            <h3 class="font-bold text-lg text-center text-indigo-800">Lapisan Badan (Wallpaper)</h3>
+                            <div id="wallpaper-layer-container" class="space-y-3 mt-2"></div>
+                            <button id="add-wallpaper-btn" class="w-full text-center mt-3 px-4 py-2 bg-indigo-100 text-indigo-800 font-bold rounded-lg hover:bg-indigo-200 transition text-sm">+ Tambah Pola Badan</button>
+                        </div>
+                        <div class="border-t pt-4">
+                            <h3 class="font-bold text-lg text-center text-amber-800">Lapisan Pinggiran (Frieze)</h3>
+                            <div id="frieze-layer-container" class="space-y-3 mt-2"></div>
+                            <button id="add-frieze-btn" class="w-full text-center mt-3 px-4 py-2 bg-amber-100 text-amber-800 font-bold rounded-lg hover:bg-amber-200 transition text-sm">+ Tambah Pola Pinggiran</button>
+                        </div>
+                    </div>
+                    <div class="border-t pt-4 space-y-2">
+                        <button id="generate-btn" class="w-full text-center px-6 py-4 bg-indigo-800 text-white font-bold rounded-lg shadow-lg hover:bg-indigo-900 transition">Generate Komposisi</button>
+                        
+                        <!-- PUBLIC SHARE CHECKBOX -->
+                        <div class="flex items-center justify-center gap-2 bg-pink-50 p-2 rounded border border-pink-200">
+                            <input type="checkbox" id="public-share-check" class="h-4 w-4 text-pink-600 rounded border-gray-300 focus:ring-pink-500">
+                            <label for="public-share-check" class="text-xs font-semibold text-pink-700">Bagikan ke Galeri Publik?</label>
+                        </div>
+
+                        <div class="grid grid-cols-2 gap-2">
+                            <button id="save-gen-gallery-btn" class="w-full text-center px-4 py-2 bg-white border-2 border-indigo-800 text-indigo-800 font-bold rounded-lg hover:bg-indigo-50 transition flex justify-center items-center gap-2">
+                                <span>Simpan</span>
+                            </button>
+                            <a id="download-btn" class="w-full block text-center px-4 py-2 bg-emerald-600 text-white font-bold rounded-lg shadow hover:bg-emerald-700 transition cursor-pointer flex items-center justify-center">Unduh PNG</a>
+                        </div>
+                        <button id="download-svg-btn" class="w-full text-center px-4 py-2 bg-pink-600 text-white font-bold rounded-lg shadow hover:bg-pink-700 transition flex items-center justify-center gap-2">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                            </svg>
+                            Unduh SVG (Vektor)
+                        </button>
+                    </div>
+                </div>
+                <!-- Generator Canvas -->
+                <div class="lg:col-span-8 bg-white rounded-lg shadow-2xl p-2 border overflow-hidden">
+                    <canvas id="pattern-canvas" class="w-full h-full rounded-md" style="height: 600px;"></canvas>
+                </div>
+            </div>
+        </section>
+
+        <!-- Drawing Studio Section -->
+        <section id="drawing-section" class="hidden">
+             <!-- (Same drawing studio code) -->
+             <div class="grid lg:grid-cols-12 gap-8">
+                <div class="lg:col-span-8 bg-white rounded-lg shadow-2xl p-2 border overflow-hidden relative group" id="drawing-container">
+                    <canvas id="drawing-canvas" class="w-full h-full rounded-md cursor-crosshair" style="height: 600px;"></canvas>
+                    <div id="active-stamp-container" class="hidden w-32 h-32 z-10 absolute left-10 top-10 stamp-active-border">
+                        <canvas id="active-stamp-canvas" class="w-full h-full"></canvas>
+                    </div>
+                    <div id="stamp-floating-controls" class="hidden absolute bottom-6 left-1/2 transform -translate-x-1/2 z-20 flex items-center gap-3 bg-white/95 backdrop-blur px-4 py-2 rounded-full shadow-lg border border-indigo-100">
+                        <button id="stamp-cancel-btn" class="flex items-center gap-2 px-4 py-2 bg-red-50 text-red-600 rounded-full font-bold text-sm hover:bg-red-100 transition shadow-sm border border-red-100"><span>✕</span> <span>Batal</span></button>
+                        <div class="h-6 w-px bg-gray-300 mx-1"></div>
+                        <button id="stamp-apply-btn" class="flex items-center gap-2 px-6 py-2 bg-indigo-600 text-white rounded-full font-bold text-sm hover:bg-indigo-700 transition shadow-md transform hover:scale-105"><span>✓</span> <span>Terapkan</span></button>
+                    </div>
+                </div>
+                <div class="lg:col-span-4 bg-white p-6 rounded-lg shadow-lg border space-y-4 h-fit">
+                    <h3 class="font-bold text-lg text-center">Alat Menggambar</h3>
+                    <div class="flex border-b text-sm">
+                        <button class="flex-1 py-2 font-medium text-indigo-600 border-b-2 border-indigo-600">Kuas</button>
+                        <button class="flex-1 py-2 font-medium text-gray-500 hover:text-indigo-600" id="stamp-tab-trigger">Stempel</button>
+                    </div>
+                    <div id="brush-controls-panel">
+                        <div class="grid grid-cols-2 gap-4 mt-2">
+                            <div><label class="block font-medium mb-2 text-sm">Warna Kuas</label><input id="brush-color-picker" type="color" value="#1E3A8A" class="h-12"></div>
+                             <div><label class="block font-medium mb-2 text-sm">Ukuran: <span id="brush-size-val">5</span></label><input id="brush-size-slider" type="range" min="1" max="50" value="5" class="w-full h-2 bg-gray-200 rounded-lg mt-4"></div>
+                        </div>
+                        <div class="border-t pt-4 mt-4">
+                             <h3 class="font-medium text-center mb-2">Mode Simetri</h3>
+                             <div class="grid grid-cols-2 gap-2">
+                                <button class="drawing-tool p-3 rounded-lg border flex items-center justify-center space-x-2" data-mode="ver"><span>Vertikal</span></button>
+                                 <button class="drawing-tool p-3 rounded-lg border flex items-center justify-center space-x-2" data-mode="hor"><span>Horizontal</span></button>
+                                 <button class="drawing-tool p-3 rounded-lg border flex items-center justify-center space-x-2" data-mode="quad"><span>Kuadran</span></button>
+                                 <button class="drawing-tool p-3 rounded-lg border flex items-center justify-center space-x-2 active" data-mode="rad"><span>Radial</span></button>
+                              </div>
+                        </div>
+                         <div id="radial-control" class="space-y-2 text-center mt-2">
+                            <label class="text-sm font-medium">Jumlah Sektor Radial</label>
+                             <div class="flex items-center justify-center space-x-2">
+                                 <button id="rad-minus" class="px-3 py-1 border rounded-md">-</button><span id="rad-count" class="text-lg font-bold">6</span><button id="rad-plus" class="px-3 py-1 border rounded-md">+</button>
+                             </div>
+                         </div>
+                    </div>
+                    <div id="stamp-controls-panel" class="hidden mt-2 space-y-3">
+                        <div class="bg-indigo-50 border border-indigo-200 rounded-md p-3 mb-2">
+                            <input type="file" id="studio-upload-input" accept="image/png, image/jpeg, image/svg+xml" class="hidden">
+                            <button id="studio-upload-btn" class="w-full flex flex-col items-center justify-center gap-1 text-indigo-700 hover:text-indigo-900 transition"><svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8 mb-1" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" /></svg><span class="text-xs font-bold">Upload & Tempel</span></button>
+                        </div>
+                        <p class="text-xs text-gray-500 text-center font-medium border-t pt-2">Atau pilih dari koleksi:</p>
+                        <div id="stamp-list" class="grid grid-cols-3 gap-2 max-h-40 overflow-y-auto p-1 bg-gray-50 rounded border"></div>
+                    </div>
+                    <div class="border-t pt-4 space-y-2">
+                        <button id="reset-drawing-btn" class="w-full text-center px-6 py-3 bg-gray-200 text-gray-700 font-bold rounded-lg hover:bg-gray-300 transition">Reset Gambar</button>
+                         <div class="grid grid-cols-2 gap-2">
+                            <button id="save-draw-gallery-btn" class="w-full text-center px-4 py-2 bg-white border-2 border-indigo-800 text-indigo-800 font-bold rounded-lg hover:bg-indigo-50 transition flex justify-center items-center gap-2"><span>Simpan</span></button>
+                            <a id="download-drawing-btn" class="w-full block text-center px-4 py-2 bg-emerald-600 text-white font-bold rounded-lg shadow hover:bg-emerald-700 transition cursor-pointer flex items-center justify-center">Unduh</a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Mockup Section -->
+        <section id="mockup-section" class="hidden">
+            <div class="grid lg:grid-cols-12 gap-8 h-[600px]">
+                <div class="lg:col-span-3 bg-white p-6 rounded-lg shadow-lg border space-y-6 h-full flex flex-col">
+                    <h3 class="font-bold text-lg text-indigo-900 border-b pb-2">Visualisasi 3D</h3>
+                    <div class="space-y-4 flex-1">
+                        <div><label class="block font-medium mb-2 text-sm text-gray-600">Pilih Objek 3D</label><select id="mockup-select" class="w-full p-3 border rounded-lg bg-gray-50 font-bold text-indigo-800 cursor-pointer hover:border-indigo-500 transition"><option value="cloth">Simulasi Kain</option><option value="totebag">Tote Bag (3D)</option><option value="custom">Upload Model 3D (.glb)</option></select></div>
+                        <div id="mockup-upload-container" class="hidden space-y-2 border-t pt-2 border-dashed border-gray-300"><label class="block text-xs font-bold text-gray-500">File Model (.glb/.gltf)</label><input type="file" id="mockup-upload-input" accept=".glb,.gltf" class="block w-full text-xs text-gray-500 file:mr-2 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-xs file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100"></div>
+                        <div id="mockup-info" class="space-y-4 mt-2">
+                            <p class="text-xs text-gray-500 italic bg-gray-50 p-2 rounded border"><span class="font-bold">Kontrol:</span> Klik & Geser mouse pada area hitam untuk memutar objek 3D.</p>
+                            <div><label class="block text-xs font-bold text-gray-500 mb-1">Skala Motif</label><input type="range" id="pattern-scale" min="1" max="10" value="2" class="w-full h-2 bg-indigo-100 rounded-lg appearance-none cursor-pointer"></div>
+                            <div id="wind-control"><label class="block text-xs font-bold text-gray-500 mb-1">Efek Angin (Kain Saja)</label><input type="range" id="wind-speed" min="0" max="10" value="5" class="w-full h-2 bg-indigo-100 rounded-lg appearance-none cursor-pointer"></div>
+                        </div>
+                    </div>
+                    <button id="update-mockup-btn" class="w-full py-4 bg-indigo-900 text-white font-bold rounded-lg shadow-lg hover:bg-indigo-800 transition flex items-center justify-center gap-2"><svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>Render Ulang</button>
+                </div>
+                <div class="lg:col-span-9 bg-gray-900 rounded-lg shadow-2xl overflow-hidden relative flex items-center justify-center" id="mockup-container">
+                    <div id="mockup-loading" class="absolute inset-0 bg-black/50 flex flex-col items-center justify-center text-white hidden z-50"><div class="loading-spinner border-t-white mb-2"></div><span>Merender Model 3D...</span></div>
+                </div>
+            </div>
+        </section>
+
+        <!-- EXPLORE SECTION (NEW) -->
+        <section id="explore-section" class="hidden">
+             <div class="text-center mb-8">
+                <h2 class="text-3xl font-bold text-gray-800">Komunitas Batik</h2>
+                <p class="text-gray-500 mt-2">Jelajahi, Sukai, dan Remix karya desainer lain.</p>
+            </div>
+            
+            <div id="explore-grid" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+                <!-- Loading State -->
+                <div class="col-span-full text-center py-12">
+                    <div class="loading-spinner mx-auto mb-2"></div>
+                    <p class="text-gray-400">Memuat galeri publik...</p>
+                </div>
+            </div>
+        </section>
+
+    </main>
+
+    <footer class="bg-indigo-900 text-white py-12 px-6 mt-20">
+        <div class="max-w-6xl mx-auto text-center">
+            <p class="font-semibold">Didesain oleh Tari Gaga — menggabungkan seni batik & matematika kristalografi.</p>
+            <p class="text-sm mt-8 text-indigo-200">&copy; 2025 Batik Kristalografi & Frieze. All rights reserved.</p>
+        </div>
+    </footer>
+
+    <!-- COMPONENTS: GALLERY (Hidden) -->
+    <button id="gallery-toggle-btn" class="fixed bottom-6 right-6 z-50 bg-indigo-900 text-white pl-4 pr-5 py-4 rounded-full shadow-2xl flex items-center space-x-3 hover:bg-indigo-800 transition-all transform hover:scale-105 border-2 border-white ring-4 ring-indigo-900/20">
+        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" /></svg>
+        <div class="flex flex-col items-start leading-tight"><span class="text-xs font-light opacity-80">Cloud Galeri</span><span class="font-bold text-sm"><span id="gallery-count-badge">0</span> Desain</span></div>
+    </button>
+    <div id="gallery-overlay" class="fixed inset-0 z-[60] hidden" aria-hidden="true">
+        <div id="gallery-backdrop" class="absolute inset-0 bg-black/40 backdrop-blur-[2px] transition-opacity"></div>
+        <div class="absolute inset-x-0 bottom-0 md:left-auto md:right-6 md:bottom-24 md:w-96 max-w-full bg-white md:rounded-2xl rounded-t-2xl shadow-2xl flex flex-col max-h-[85vh] transition-transform transform translate-y-0">
+            <div class="p-4 border-b border-gray-100 flex justify-between items-center bg-gray-50 md:rounded-t-2xl rounded-t-2xl">
+                <div class="flex items-center space-x-2"><h3 class="font-bold text-indigo-900">Koleksi Pribadi</h3><span class="px-2 py-0.5 bg-indigo-100 text-indigo-800 text-xs rounded-full font-bold" id="gallery-header-count">0</span></div>
+                <button id="close-gallery-btn" class="p-1 rounded-full hover:bg-gray-200 text-gray-500 transition"><svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg></button>
+            </div>
+            <div id="gallery-grid" class="flex-1 overflow-y-auto p-4 custom-scrollbar space-y-4"><div id="empty-gallery-msg" class="text-center py-12 px-4 border-2 border-dashed border-gray-200 rounded-xl bg-gray-50/50"><div class="loading-spinner mx-auto mb-3" id="initial-loading-spinner"></div><p class="text-gray-500 font-medium text-sm" id="empty-text">Memuat Data Cloud...</p></div></div>
+             <div class="p-3 border-t bg-gray-50 md:rounded-b-2xl text-center"><p class="text-xs text-green-600 font-medium flex items-center justify-center gap-1"><svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd" /></svg>Privat & Aman</p></div>
+        </div>
+    </div>
+
+<script type="module">
+    import * as THREE from 'three';
+    import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
+
+    import { initializeApp } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js';
+    import { getAuth, signInAnonymously, onAuthStateChanged, signInWithCustomToken } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js';
+    import { getFirestore, collection, addDoc, deleteDoc, onSnapshot, doc, serverTimestamp, updateDoc, increment } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js';
+
+    // DOM Elements
+    const galleryToggleBtn = document.getElementById('gallery-toggle-btn');
+    const galleryOverlay = document.getElementById('gallery-overlay');
+    const galleryBackdrop = document.getElementById('gallery-backdrop');
+    const closeGalleryBtn = document.getElementById('close-gallery-btn');
+    const galleryGrid = document.getElementById('gallery-grid');
+    const emptyGalleryMsg = document.getElementById('empty-gallery-msg');
+    const emptyText = document.getElementById('empty-text');
+    const initialLoadingSpinner = document.getElementById('initial-loading-spinner');
+    const galleryCountBadge = document.getElementById('gallery-count-badge');
+    const galleryHeaderCount = document.getElementById('gallery-header-count');
+    const authStatusDiv = document.getElementById('auth-status');
+    const stampList = document.getElementById('stamp-list');
+    const activeStampContainer = document.getElementById('active-stamp-container');
+    const activeStampCanvas = document.getElementById('active-stamp-canvas');
+    const stampCancelBtn = document.getElementById('stamp-cancel-btn');
+    const stampApplyBtn = document.getElementById('stamp-apply-btn');
+    const stampFloatingControls = document.getElementById('stamp-floating-controls');
+    const uploadInput = document.getElementById('motif-upload-input');
+    const uploadBtn = document.getElementById('upload-motif-btn');
+    const uploadBtnContent = document.getElementById('upload-btn-content');
+    const uploadLoading = document.getElementById('upload-loading');
+    const modeTraceBtn = document.getElementById('mode-trace-btn');
+    const modeOriginalBtn = document.getElementById('mode-original-btn');
+    const uploadHint = document.getElementById('upload-hint');
+    const studioUploadBtn = document.getElementById('studio-upload-btn');
+    const studioUploadInput = document.getElementById('studio-upload-input');
+    const tabGenerator = document.getElementById('tab-generator');
+    const tabDrawing = document.getElementById('tab-drawing');
+    const tabMockup = document.getElementById('tab-mockup'); 
+    const tabExplore = document.getElementById('tab-explore'); // NEW
+    const generatorSection = document.getElementById('generator-section');
+    const drawingSection = document.getElementById('drawing-section');
+    const mockupSection = document.getElementById('mockup-section');
+    const exploreSection = document.getElementById('explore-section'); // NEW
+    const exploreGrid = document.getElementById('explore-grid'); // NEW
+    const patternCanvas = document.getElementById('pattern-canvas');
+    const ptx = patternCanvas.getContext('2d');
+    const drawingCanvas = document.getElementById('drawing-canvas');
+    const dtx = drawingCanvas.getContext('2d');
+    const bgColorPicker = document.getElementById('bg-color-picker');
+    const generateBtn = document.getElementById('generate-btn');
+    const downloadBtn = document.getElementById('download-btn');
+    const downloadSvgBtn = document.getElementById('download-svg-btn'); 
+    const wallpaperLayerContainer = document.getElementById('wallpaper-layer-container');
+    const friezeLayerContainer = document.getElementById('frieze-layer-container');
+    const addWallpaperBtn = document.getElementById('add-wallpaper-btn');
+    const addFriezeBtn = document.getElementById('add-frieze-btn');
+    const stampTabTrigger = document.getElementById('stamp-tab-trigger');
+    const brushControlsPanel = document.getElementById('brush-controls-panel');
+    const stampControlsPanel = document.getElementById('stamp-controls-panel');
+    const brushColorPicker = document.getElementById('brush-color-picker');
+    const brushSizeSlider = document.getElementById('brush-size-slider');
+    const brushSizeVal = document.getElementById('brush-size-val');
+    const radMinus = document.getElementById('rad-minus'); 
+    const radPlus = document.getElementById('rad-plus'); 
+    const radCount = document.getElementById('rad-count');
+    const resetDrawingBtn = document.getElementById('reset-drawing-btn');
+    const downloadDrawingBtn = document.getElementById('download-drawing-btn');
+    const drawingTools = document.querySelectorAll('.drawing-tool');
+    const mockupSelect = document.getElementById('mockup-select');
+    const clothControls = document.getElementById('cloth-controls');
+    const windSpeedSlider = document.getElementById('wind-speed');
+    const patternScaleSlider = document.getElementById('pattern-scale');
+    const updateMockupBtn = document.getElementById('update-mockup-btn');
+    const mockupContainer = document.getElementById('mockup-container');
+    const mockupLoading = document.getElementById('mockup-loading');
+    const windControl = document.getElementById('wind-control');
+    const mockupUploadContainer = document.getElementById('mockup-upload-container');
+    const mockupUploadInput = document.getElementById('mockup-upload-input');
+    const publicShareCheck = document.getElementById('public-share-check'); // NEW
+
+    // Firebase
+    const firebaseConfig = JSON.parse(__firebase_config);
+    const app = initializeApp(firebaseConfig);
+    const auth = getAuth(app);
+    const db = getFirestore(app);
+    const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+    
+    let currentUser = null;
+    let layerIdCounter = 0;
+    let layers = [];
+    let customMotifCount = 0;
+    let activeStampId = null;
+    const customMotifs = {};
+    
+    const motifs = {
+        parang: 'M -30,-50 C -50,-10 -10,10 10,50 C 30,10 70,-10 30,-50 C 10,-20 -10,-20 -30,-50 Z',
+        kawung: 'M 0 -30 A 20 30 0 0 1 0 30 A 20 30 0 0 1 0 -30 M -30 0 A 30 20 0 0 1 30 0 A 30 20 0 0 1 -30 0 M 0 -5 A 5 5 0 0 1 0 5 A 5 5 0 0 1 0 -5 Z',
+        truntum: 'M 0 -25 C 10 -15, 10 -15, 15 -15 L 25 0 L 15 15 C 10 15, 10 15, 0 25 C -10 15, -10 15, -15 15 L -25 0 L -15 -15 C -10 -15, -10 -15, 0 -25 Z',
+        sidomukti: 'M 0 -30 L 30 0 L 0 30 L -30 0 Z M 0 -15 C 10 -5, 15 5, 0 15 C -15 5, -10 -5, 0 -15 Z',
+        'mega-mendung': 'M -50 20 C -40 -10, 0 -10, 20 10 C 40 -5, 60 10, 50 30 C 30 40, -10 40, -30 30 C -50 20, -70 10, -50 20 Z M -35 10 C -25 -20, 15 -20, 35 0 C 55 -15, 75 0, 65 20 C 45 30, 5 30, -15 20 C -35 10, -55 0, -35 10 Z',
+        ceplok: 'M-25,-25 H25 V25 H-25 Z M 0 -20 L 20 0 L 0 20 L -20 0 Z M 0 -10 A 10 10 0 0 1 0 10 A 10 10 0 0 1 0 -10 Z',
+        tumpal: 'M 0 -30 L 25 25 L -25 25 Z',
+        lereng: 'M -40 -20 L 0 20 L 40 -20 M -20 -40 L 20 0 L 60 -40'
+    };
+
+    // --- AUTH ---
+    const initAuth = async () => {
+        try {
+            if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) { await signInWithCustomToken(auth, __initial_auth_token); } 
+            else { await signInAnonymously(auth); }
+        } catch (error) { console.error("Auth Error:", error); authStatusDiv.textContent = "Mode Offline"; authStatusDiv.classList.remove('opacity-0'); }
+    };
+    initAuth();
+    onAuthStateChanged(auth, (user) => { 
+        currentUser = user; 
+        if (user) { 
+            authStatusDiv.textContent = `Cloud Aktif • ID: ${user.uid.substring(0,6)}...`; 
+            authStatusDiv.classList.remove('opacity-0'); 
+            initGalleryListener(user.uid); 
+            initPublicGalleryListener(); // Listen to public feed
+        } 
+    });
+
+    // --- GALLERY LOGIC ---
+    function toggleGallery() { galleryOverlay.classList.toggle('hidden'); }
+    galleryToggleBtn.addEventListener('click', toggleGallery);
+    closeGalleryBtn.addEventListener('click', toggleGallery);
+    galleryBackdrop.addEventListener('click', toggleGallery);
+
+    async function saveToCloud(sourceCanvas, type, buttonId) {
+        if (!currentUser) return alert("Menunggu koneksi cloud...");
+        const btn = document.getElementById(buttonId);
+        const originalText = btn.innerHTML;
+        btn.innerHTML = `<div class="loading-spinner" style="border-width:2px; width:14px; height:14px;"></div> <span class="text-xs">Menyimpan...</span>`;
+        btn.disabled = true;
+
+        try {
+            const dataUrl = sourceCanvas.toDataURL('image/jpeg', 0.6);
+            const payload = { 
+                image: dataUrl, 
+                type: type, 
+                createdAt: serverTimestamp(),
+                author: currentUser.uid.substring(0,6), // For public display
+                likes: 0
+            };
+            if (type === 'Generator') { payload.config = { bgColor: bgColorPicker.value, layers: layers }; }
+            
+            // 1. Save to Private Vault
+            await addDoc(collection(db, 'artifacts', appId, 'users', currentUser.uid, 'designs'), payload);
+            
+            // 2. If Public Checkbox Checked, Save to Public Feed
+            if(publicShareCheck && publicShareCheck.checked) {
+                await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'gallery'), payload);
+                alert("Berhasil disimpan ke Galeri Pribadi & Publik!");
+            }
+
+            btn.innerHTML = `<span class="text-green-600">✓ Tersimpan</span>`;
+            if(galleryOverlay.classList.contains('hidden') && !publicShareCheck.checked) { toggleGallery(); } // Only open private gallery if not sharing public
+
+        } catch (e) { alert("Gagal menyimpan: " + e.message); btn.innerHTML = `<span class="text-red-600">Gagal</span>`; } 
+        finally { setTimeout(() => { btn.innerHTML = originalText; btn.disabled = false; }, 2000); }
+    }
+
+    function initGalleryListener(userId) {
+        const q = collection(db, 'artifacts', appId, 'users', userId, 'designs');
+        onSnapshot(q, (snapshot) => {
+            const items = [];
+            snapshot.forEach((doc) => { items.push({ id: doc.id, ...doc.data() }); });
+            items.sort((a, b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0));
+            updateGalleryUI(items);
+        });
+    }
+
+    // --- EXPLORE / PUBLIC FEED LOGIC ---
+    function initPublicGalleryListener() {
+        const q = collection(db, 'artifacts', appId, 'public', 'data', 'gallery');
+        onSnapshot(q, (snapshot) => {
+            const items = [];
+            snapshot.forEach((doc) => { items.push({ id: doc.id, ...doc.data() }); });
+            // Sort by Likes then Date
+            items.sort((a, b) => (b.likes || 0) - (a.likes || 0));
+            updatePublicGalleryUI(items);
+        });
+    }
+
+    function updatePublicGalleryUI(items) {
+        exploreGrid.innerHTML = '';
+        if (items.length === 0) {
+            exploreGrid.innerHTML = `<div class="col-span-full text-center py-12 text-gray-400">Belum ada karya publik. Jadilah yang pertama!</div>`;
+            return;
+        }
+
+        items.forEach(item => {
+            const date = item.createdAt ? new Date(item.createdAt.seconds * 1000).toLocaleDateString() : '';
+            const isRemixable = item.type === 'Generator' && item.config;
+            const likeCount = item.likes || 0;
+
+            const card = document.createElement('div');
+            card.className = 'bg-white rounded-xl shadow-md overflow-hidden hover:shadow-xl transition duration-300 border border-gray-100 flex flex-col';
+            card.innerHTML = `
+                <div class="h-48 overflow-hidden relative group">
+                    <img src="${item.image}" class="w-full h-full object-cover transition transform group-hover:scale-110">
+                    <div class="absolute top-2 right-2 bg-black/50 text-white text-xs px-2 py-1 rounded-full backdrop-blur">
+                        Oleh: ${item.author || 'Anon'}
+                    </div>
+                </div>
+                <div class="p-4 flex-1 flex flex-col justify-between">
+                    <div class="flex justify-between items-start mb-2">
+                        <div>
+                            <h4 class="font-bold text-gray-800 text-sm">${item.type}</h4>
+                            <p class="text-xs text-gray-500">${date}</p>
+                        </div>
+                        <div class="flex items-center space-x-1 bg-pink-50 px-2 py-1 rounded-full">
+                            <button class="like-btn text-pink-500 hover:text-pink-700 transition" data-id="${item.id}">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                                    <path fill-rule="evenodd" d="M3.172 5.172a4 4 0 015.656 0L10 6.343l1.172-1.171a4 4 0 115.656 5.656L10 17.657l-6.828-6.829a4 4 0 010-5.656z" clip-rule="evenodd" />
+                                </svg>
+                            </button>
+                            <span class="text-xs font-bold text-pink-700">${likeCount}</span>
+                        </div>
+                    </div>
+                    ${isRemixable ? `
+                    <button class="remix-btn w-full mt-3 flex items-center justify-center gap-2 px-4 py-2 bg-indigo-100 text-indigo-700 rounded-lg text-sm font-bold hover:bg-indigo-200 transition" data-config='${JSON.stringify(item.config)}'>
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7v8a2 2 0 002 2h6M8 7V5a2 2 0 012-2h4.586a1 1 0 01.707.293l4.414 4.414a1 1 0 01.293.707V15a2 2 0 01-2 2h-2M8 7H6a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2v-2" />
+                        </svg>
+                        Remix Desain
+                    </button>` : ''}
+                </div>
+            `;
+            exploreGrid.appendChild(card);
+        });
+
+        // Attach Listeners
+        document.querySelectorAll('.like-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => handleLike(e.currentTarget.dataset.id));
+        });
+        document.querySelectorAll('.remix-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                const config = JSON.parse(e.currentTarget.dataset.config);
+                loadConfig(config);
+            });
+        });
+    }
+
+    async function handleLike(docId) {
+        if (!currentUser) return;
+        const ref = doc(db, 'artifacts', appId, 'public', 'data', 'gallery', docId);
+        try {
+            await updateDoc(ref, { likes: increment(1) });
+        } catch (e) { console.error("Like error", e); }
+    }
+
+    function updateGalleryUI(items) {
+        const count = items.length; galleryCountBadge.textContent = count; galleryHeaderCount.textContent = count;
+        if (count === 0) { emptyGalleryMsg.classList.remove('hidden'); initialLoadingSpinner.style.display = 'none'; emptyText.textContent = "Belum ada koleksi cloud."; Array.from(galleryGrid.children).forEach(child => { if(child.id !== 'empty-gallery-msg') child.remove(); }); return; }
+        emptyGalleryMsg.classList.add('hidden'); galleryGrid.innerHTML = ''; galleryGrid.appendChild(emptyGalleryMsg);
+        items.forEach(item => {
+            const date = item.createdAt ? new Date(item.createdAt.seconds * 1000).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : 'Baru saja';
+            const isEditable = item.type === 'Generator' && item.config;
+            const editBtn = isEditable ? `<button class="edit-btn text-xs text-indigo-600 hover:text-indigo-800 flex items-center gap-1 font-bold bg-indigo-50 px-2 py-1 rounded" data-id="${item.id}">✏️ Edit</button>` : '';
+            const itemDiv = document.createElement('div');
+            itemDiv.className = 'gallery-item relative group bg-white p-2 rounded-lg border border-gray-200 shadow-sm hover:shadow-md transition duration-200 flex gap-3 items-center';
+            if(isEditable) { itemDiv.dataset.config = JSON.stringify(item.config); }
+            itemDiv.innerHTML = `<div class="h-16 w-16 flex-shrink-0 bg-gray-100 rounded-md overflow-hidden border"><img src="${item.image}" class="w-full h-full object-cover"></div><div class="flex-1 min-w-0"><div class="flex justify-between items-start"><p class="font-bold text-gray-800 text-sm truncate">${item.type}</p><span class="text-[10px] bg-gray-100 px-1 rounded text-gray-500">${date}</span></div><div class="flex mt-2 items-center justify-between"><div class="flex space-x-2">${editBtn}<a href="${item.image}" download="batik_${item.type}.jpg" class="text-xs text-gray-500 hover:text-gray-800 flex items-center gap-1 px-1 py-1">⬇</a></div><button class="delete-btn text-xs text-red-400 hover:text-red-600 flex items-center gap-1 px-1 py-1" data-id="${item.id}">🗑</button></div></div>`;
+            galleryGrid.appendChild(itemDiv);
+        });
+        document.querySelectorAll('.delete-btn').forEach(btn => { btn.addEventListener('click', (e) => { deleteFromCloud(e.currentTarget.dataset.id); }); });
+        document.querySelectorAll('.edit-btn').forEach(btn => { btn.addEventListener('click', (e) => { const card = e.currentTarget.closest('.gallery-item'); const configStr = card.dataset.config; if(configStr) { loadConfig(JSON.parse(configStr)); } }); });
+    }
+
+    async function deleteFromCloud(docId) { if(!confirm('Hapus?')) return; try { await deleteDoc(doc(db, 'artifacts', appId, 'users', currentUser.uid, 'designs', docId)); } catch (e) { alert("Gagal: " + e.message); } }
+
+    function loadConfig(config) {
+        if(!config || !config.layers) return;
+        if(layers.length > 0 && !confirm("Muat desain ini? Pekerjaan saat ini akan tertimpa.")) return;
+        try {
+            layers = config.layers; bgColorPicker.value = config.bgColor || '#FEFBEB';
+            const maxId = layers.reduce((max, layer) => Math.max(max, layer.id || 0), 0); layerIdCounter = maxId + 1;
+            renderLayerControls();
+            if(tabGenerator) tabGenerator.click(); toggleGallery();
+            if(activeStampContainer && !activeStampContainer.classList.contains('hidden')) activeStampContainer.classList.add('hidden'); // Clean studio state
+            requestAnimationFrame(() => { handleGenerateClick(); setTimeout(handleGenerateClick, 50); });
+        } catch (e) { alert("Error memuat desain: " + e.message); }
+    }
+
+    // SVG GENERATOR
+    downloadSvgBtn.addEventListener('click', () => {
+        const svgContent = generateSVG(patternCanvas.width, patternCanvas.height, { bgColor: bgColorPicker.value, layers: layers });
+        const blob = new Blob([svgContent], {type: 'image/svg+xml'});
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a'); link.href = url; link.download = 'batik_vector_pro.svg'; link.click(); URL.revokeObjectURL(url);
+    });
+
+    function generateSVG(width, height, state) {
+        let svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">`;
+        svg += `<rect width="100%" height="100%" fill="${state.bgColor}" />`;
+        const activeFriezeLayers = state.layers.filter(l => l.type === 'frieze' && l.active);
+        let borderHeight = 0;
+        if (activeFriezeLayers.length > 0) { const maxFriezeSpacing = Math.max(...activeFriezeLayers.map(l => l.spacing)); borderHeight = Math.max(maxFriezeSpacing / 2, 60); }
+        svg += `<defs><clipPath id="wallpaperClip"><rect x="0" y="${borderHeight}" width="${width}" height="${height - borderHeight * 2}" /></clipPath></defs>`;
+        const renderLayerToSVG = (layer, clipId = null) => {
+            let layerSVG = clipId ? `<g clip-path="url(#${clipId})">` : `<g>`;
+            const layerState = { motifSize: layer.size / 100, spacing: layer.spacing };
+            let transformLists = [];
+            if(layer.type === 'frieze') {
+                const top = calculateFriezeTransforms(layerState, width, height, borderHeight / 2, layer.symmetry);
+                const bottom = calculateFriezeTransforms(layerState, width, height, height - (borderHeight / 2), layer.symmetry);
+                transformLists = [...top, ...bottom];
+            } else { transformLists = calculateWallpaperTransforms(layerState, width, height, layer.symmetry); }
+            transformLists.forEach(tList => {
+                let transformAttr = '';
+                tList.forEach(t => { if (t.t === 'tr') transformAttr += `translate(${t.x}, ${t.y}) `; else if (t.t === 'ro') transformAttr += `rotate(${t.a}) `; else if (t.t === 'sc') transformAttr += `scale(${t.x}, ${t.y}) `; });
+                if (motifs[layer.motif]) { layerSVG += `<path d="${motifs[layer.motif]}" fill="${layer.color}" transform="${transformAttr}" />`; } 
+                else if (customMotifs[layer.motif]) { const mData = customMotifs[layer.motif]; const imgData = mData.canvas.toDataURL('image/png'); layerSVG += `<image href="${imgData}" x="-50" y="-50" width="100" height="100" transform="${transformAttr}" />`; }
+            });
+            layerSVG += `</g>`; return layerSVG;
+        };
+        state.layers.filter(l => l.type === 'frieze' && l.active).forEach(l => { svg += renderLayerToSVG(l); });
+        state.layers.filter(l => l.type === 'wallpaper' && l.active).forEach(l => { svg += renderLayerToSVG(l, 'wallpaperClip'); });
+        svg += `</svg>`; return svg;
+    }
+
+    // --- STANDARD APP ---
+    document.getElementById('save-gen-gallery-btn').addEventListener('click', () => { saveToCloud(document.getElementById('pattern-canvas'), 'Generator', 'save-gen-gallery-btn'); });
+    document.getElementById('save-draw-gallery-btn').addEventListener('click', () => { saveToCloud(document.getElementById('drawing-canvas'), 'Kustom', 'save-draw-gallery-btn'); });
+
+    function handleGenerateClick() {
+        const dpr = window.devicePixelRatio || 1;
+        const container = patternCanvas.parentElement;
+        let width = container.clientWidth || 800; let height = parseInt(patternCanvas.style.height) || container.clientHeight || 600;
+        patternCanvas.width = width * dpr; patternCanvas.height = height * dpr; ptx.scale(dpr, dpr);
+        const currentState = { bgColor: bgColorPicker.value, layers: layers, };
+        drawPattern(ptx, width, height, currentState);
+    }
+
+    // Upload & Modes
+    let uploadMode = 'trace';
+    modeTraceBtn.addEventListener('click', () => { uploadMode = 'trace'; modeTraceBtn.classList.add('bg-white', 'text-indigo-700', 'shadow-sm'); modeTraceBtn.classList.remove('text-gray-500'); modeOriginalBtn.classList.remove('bg-white', 'text-indigo-700', 'shadow-sm'); modeOriginalBtn.classList.add('text-gray-500'); uploadHint.textContent = "Putih jadi Transparan"; });
+    modeOriginalBtn.addEventListener('click', () => { uploadMode = 'original'; modeOriginalBtn.classList.add('bg-white', 'text-indigo-700', 'shadow-sm'); modeOriginalBtn.classList.remove('text-gray-500'); modeTraceBtn.classList.remove('bg-white', 'text-indigo-700', 'shadow-sm'); modeTraceBtn.classList.add('text-gray-500'); uploadHint.textContent = "Gambar Asli"; });
+
+    studioUploadBtn.addEventListener('click', () => studioUploadInput.click());
+    studioUploadInput.addEventListener('change', (e) => processUpload(e.target.files[0], 'studio'));
+    uploadBtn.addEventListener('click', () => uploadInput.click());
+    uploadInput.addEventListener('change', (e) => processUpload(e.target.files[0], 'generator'));
+
+    function processUpload(file, context) {
+        if (!file) return;
+        if(context === 'generator') { uploadBtn.disabled = true; uploadBtnContent.classList.add('hidden'); uploadLoading.classList.remove('hidden'); }
+        const reader = new FileReader();
+        reader.onload = (event) => {
+            const img = new Image();
+            img.onload = () => {
+                let processedCanvas, isMask;
+                if (uploadMode === 'trace' && context === 'generator') { processedCanvas = createMotifMask(img); isMask = true; } 
+                else { processedCanvas = createSimpleImage(img); isMask = false; }
+                customMotifCount++; const id = `custom_${customMotifCount}`;
+                customMotifs[id] = { name: `Custom ${customMotifCount}`, canvas: processedCanvas, isMask: isMask };
+                renderLayerControls(); updateStampList();
+                if(context === 'generator') {
+                    uploadBtn.disabled = false; uploadBtnContent.classList.remove('hidden'); uploadLoading.classList.add('hidden');
+                    if (!generatorSection.classList.contains('hidden')) { createLayer('wallpaper'); const newLayer = layers[layers.length - 1]; newLayer.motif = id; renderLayerControls(); handleGenerateClick(); }
+                } else { if(stampTabTrigger) stampTabTrigger.click(); activateStamp(id, true); }
+            };
+            img.src = event.target.result;
+        };
+        reader.readAsDataURL(file);
+    }
+
+    function createMotifMask(sourceImg) {
+        const size = 100; const c = document.createElement('canvas'); c.width = size; c.height = size; const ctx = c.getContext('2d');
+        const aspect = sourceImg.width / sourceImg.height; let drawW = size, drawH = size; if(aspect > 1) drawH = size / aspect; else drawW = size * aspect;
+        ctx.drawImage(sourceImg, (size-drawW)/2, (size-drawH)/2, drawW, drawH);
+        const imgData = ctx.getImageData(0, 0, size, size); const data = imgData.data;
+        for (let i = 0; i < data.length; i += 4) { const avg = (data[i] + data[i+1] + data[i+2]) / 3; if (data[i+3] < 50 || avg > 230) { data[i+3] = 0; } else { data[i]=0; data[i+1]=0; data[i+2]=0; data[i+3]=255; } }
+        ctx.putImageData(imgData, 0, 0); return c;
+    }
+    function createSimpleImage(sourceImg) {
+        const size = 100; const c = document.createElement('canvas'); c.width = size; c.height = size; const ctx = c.getContext('2d');
+        const aspect = sourceImg.width / sourceImg.height; let drawW = size, drawH = size; if(aspect > 1) drawH = size / aspect; else drawW = size * aspect;
+        ctx.drawImage(sourceImg, (size-drawW)/2, (size-drawH)/2, drawW, drawH); return c;
+    }
+
+    // --- TAB LOGIC (UPDATED WITH EXPLORE) ---
+    function switchTab(target) {
+        [tabGenerator, tabDrawing, tabMockup, tabExplore].forEach(t => t.classList.remove('active', 'border-indigo-500'));
+        target.classList.add('active', 'border-indigo-500');
+        [generatorSection, drawingSection, mockupSection, exploreSection].forEach(s => s.classList.add('hidden'));
+    }
+
+    tabGenerator.addEventListener('click', () => { switchTab(tabGenerator); generatorSection.classList.remove('hidden'); setTimeout(handleGenerateClick, 10); });
+    tabDrawing.addEventListener('click', () => { switchTab(tabDrawing); drawingSection.classList.remove('hidden'); updateStampList(); setTimeout(resizeDrawingCanvas, 10); });
+    tabMockup.addEventListener('click', () => { switchTab(tabMockup); mockupSection.classList.remove('hidden'); updateMockup(); });
+    tabExplore.addEventListener('click', () => { switchTab(tabExplore); exploreSection.classList.remove('hidden'); });
+
+    // --- GENERATOR LOGIC ---
+    const symmetryOptions = { wallpaper: ['w_p1','w_p2','w_pm','w_pg','w_cm','w_pmm','w_pmg','w_pgg','w_cmm','w_p4','w_p4m','w_p4g','w_p3','w_p3m1','w_p31m','w_p6','w_p6m'], frieze: ['f_p1','f_p2','f_p1m1','f_p11m','f_p11g','f_p2mg','f_p2mm'] };
+    function createLayer(type) { const id = layerIdCounter++; const defaultConfig = { id: id, type: type, active: true, motif: 'kawung', symmetry: type === 'wallpaper' ? 'w_p6m' : 'f_p2mm', color: `#${Math.floor(Math.random()*16777215).toString(16).padStart(6, '0')}`, size: 50, spacing: 120 }; layers.push(defaultConfig); renderLayerControls(); }
+    function deleteLayer(id) { layers = layers.filter(l => l.id !== id); renderLayerControls(); }
+    function updateLayer(id, key, value) { const layer = layers.find(l => l.id === id); if (layer) { layer[key] = value; } }
+    
+    function renderLayerControls() {
+        wallpaperLayerContainer.innerHTML = ''; friezeLayerContainer.innerHTML = '';
+        let wallpaperCounter = 0; let friezeCounter = 0;
+        if(!layers || !Array.isArray(layers)) return;
+        const standardOptions = Object.keys(motifs).map(m => `<option value="${m}">${m.charAt(0).toUpperCase() + m.slice(1)}</option>`).join('');
+        const customOptions = Object.keys(customMotifs).map(id => `<option value="${id}">${customMotifs[id].name}</option>`).join('');
+        const allMotifOptions = `<optgroup label="Standar">${standardOptions}</optgroup>` + (customOptions ? `<optgroup label="Kustom">${customOptions}</optgroup>` : '');
+        layers.forEach((layer) => {
+            const card = document.createElement('div'); card.className = 'p-3 rounded-lg border bg-gray-50 space-y-2';
+            const isWallpaper = layer.type === 'wallpaper'; let labelText = isWallpaper ? `Pola Badan ${++wallpaperCounter}` : `Pola Pinggiran ${++friezeCounter}`;
+            const symOpts = symmetryOptions[layer.type] || []; const symmetryDropdownHTML = symOpts.map((s, index) => `<option value="${s}" ${layer.symmetry === s ? 'selected' : ''}>Pola ${index + 1}</option>`).join('');
+            card.innerHTML = `<div class="flex items-center justify-between"><span class="font-medium text-sm">${labelText}</span><div class="flex items-center space-x-2"><div class="relative inline-block w-10 align-middle select-none"><input type="checkbox" data-id="${layer.id}" data-key="active" class="layer-control toggle-checkbox absolute block w-6 h-6 rounded-full bg-white border-4 appearance-none cursor-pointer" ${layer.active ? 'checked' : ''}/><label class="toggle-label block overflow-hidden h-6 rounded-full bg-gray-300 cursor-pointer"></label></div><button data-id="${layer.id}" class="delete-layer-btn text-red-500 hover:text-red-700 font-bold text-xl">&times;</button></div></div><div class="flex items-center space-x-2"><input type="color" data-id="${layer.id}" data-key="color" value="${layer.color}" class="layer-control w-1/4"><select data-id="${layer.id}" data-key="motif" class="layer-control w-3/4 p-2 border rounded-md shadow-sm text-xs">${allMotifOptions}</select></div><select data-id="${layer.id}" data-key="symmetry" class="layer-control w-full p-2 border rounded-md shadow-sm text-xs">${symmetryDropdownHTML}</select><div class="text-xs space-y-1 pt-1"><label>Ukuran: <span id="size-val-${layer.id}">${layer.size}</span></label><input type="range" min="10" max="150" value="${layer.size}" data-id="${layer.id}" data-key="size" class="layer-control w-full h-2 bg-gray-200 rounded-lg"><label>Kerapatan: <span id="spacing-val-${layer.id}">${layer.spacing}</span></label><input type="range" min="50" max="300" value="${layer.spacing}" data-id="${layer.id}" data-key="spacing" class="layer-control w-full h-2 bg-gray-200 rounded-lg"></div>`;
+            const select = card.querySelector(`select[data-key="motif"]`); if(select) select.value = layer.motif;
+            if (isWallpaper) { wallpaperLayerContainer.appendChild(card); } else { friezeLayerContainer.appendChild(card); }
+        });
+    }
+    const eventHandler = (e) => {
+        const target = e.target;
+        if (target.classList.contains('delete-layer-btn')) { deleteLayer(parseInt(target.dataset.id)); } 
+        else if (target.classList.contains('layer-control')) {
+            const id = parseInt(target.dataset.id); const key = target.dataset.key;
+            let value = target.type === 'checkbox' ? target.checked : target.value; if (target.type === 'range') { value = parseInt(value); document.getElementById(`${key}-val-${id}`).textContent = value; }
+            updateLayer(id, key, value);
+        }
+    };
+    wallpaperLayerContainer.addEventListener('click', eventHandler); friezeLayerContainer.addEventListener('click', eventHandler);
+    wallpaperLayerContainer.addEventListener('change', eventHandler); friezeLayerContainer.addEventListener('change', eventHandler);
+    wallpaperLayerContainer.addEventListener('input', eventHandler); friezeLayerContainer.addEventListener('input', eventHandler);
+    addWallpaperBtn.addEventListener('click', () => createLayer('wallpaper')); addFriezeBtn.addEventListener('click', () => createLayer('frieze'));
+    
+    function drawPattern(targetCtx, width, height, state) {
+        targetCtx.fillStyle = state.bgColor; targetCtx.fillRect(0, 0, width, height);
+        const activeFriezeLayers = state.layers.filter(l => l.type === 'frieze' && l.active);
+        const activeWallpaperLayers = state.layers.filter(l => l.type === 'wallpaper' && l.active);
+        let borderHeight = 0; if (activeFriezeLayers.length > 0) { const maxFriezeSpacing = Math.max(...activeFriezeLayers.map(l => l.spacing)); borderHeight = Math.max(maxFriezeSpacing / 2, 60); }
+        
+        const renderMotif = (ctx, layer) => {
+            const motifKey = layer.motif;
+            if (motifs[motifKey]) { ctx.fillStyle = layer.color; ctx.fill(new Path2D(motifs[motifKey])); } 
+            else if (customMotifs[motifKey]) {
+                const motifData = customMotifs[motifKey]; const maskCanvas = motifData.canvas;
+                if (motifData.isMask) { ctx.save(); ctx.shadowColor = layer.color; ctx.shadowBlur = 0; ctx.shadowOffsetX = 10000; ctx.shadowOffsetY = 0; ctx.drawImage(maskCanvas, -10000 - 50, -50, 100, 100); ctx.restore(); } 
+                else { ctx.drawImage(maskCanvas, -50, -50, 100, 100); }
+            }
+        };
+        activeFriezeLayers.forEach(layer => {
+            const layerState = { motifSize: layer.size / 100, spacing: layer.spacing };
+            const transformsTop = calculateFriezeTransforms(layerState, width, height, borderHeight / 2, layer.symmetry);
+            const transformsBottom = calculateFriezeTransforms(layerState, width, height, height - (borderHeight / 2), layer.symmetry);
+            [...transformsTop, ...transformsBottom].forEach(transformList => { targetCtx.save(); transformList.forEach(tf => { if (tf.t === 'tr') targetCtx.translate(tf.x, tf.y); else if (tf.t === 'ro') targetCtx.rotate(tf.a * Math.PI / 180); else if (tf.t === 'sc') targetCtx.scale(tf.x, tf.y); }); renderMotif(targetCtx, layer); targetCtx.restore(); });
+        });
+        if (activeWallpaperLayers.length > 0) {
+            targetCtx.save(); targetCtx.beginPath(); targetCtx.rect(0, borderHeight, width, height - borderHeight * 2); targetCtx.clip();
+            activeWallpaperLayers.forEach(layer => {
+                const layerState = { motifSize: layer.size / 100, spacing: layer.spacing };
+                const transforms = calculateWallpaperTransforms(layerState, width, height, layer.symmetry);
+                 transforms.forEach(transformList => { targetCtx.save(); transformList.forEach(tf => { if (tf.t === 'tr') targetCtx.translate(tf.x, tf.y); else if (tf.t === 'ro') targetCtx.rotate(tf.a * Math.PI / 180); else if (tf.t === 'sc') targetCtx.scale(tf.x, tf.y); }); renderMotif(targetCtx, layer); targetCtx.restore(); });
+            });
+            targetCtx.restore();
+        }
+    }
+    // Symmetry Calcs
+    function calculateFriezeTransforms(layerState, width, height, y_center, symmetry) { const commands = []; const { motifSize, spacing } = layerState; const addCmd = (transformations) => commands.push(transformations); const h_spacing = spacing; for (let x = -h_spacing; x < width + h_spacing; x += h_spacing) { switch(symmetry) { case 'f_p1': addCmd([{t:'tr',x:x,y:y_center},{t:'sc',x:motifSize,y:motifSize}]); break; case 'f_p2': addCmd([{t:'tr',x:x,y:y_center},{t:'sc',x:motifSize,y:motifSize}]); addCmd([{t:'tr',x:x+h_spacing/2,y:y_center},{t:'ro',a:180},{t:'sc',x:motifSize,y:motifSize}]); break; case 'f_p1m1': addCmd([{t:'tr',x:x,y:y_center},{t:'sc',x:motifSize,y:motifSize}]); addCmd([{t:'tr',x:x,y:y_center},{t:'sc',x:-motifSize,y:motifSize}]); break; case 'f_p11m': addCmd([{t:'tr',x:x,y:y_center},{t:'sc',x:motifSize,y:motifSize}]); addCmd([{t:'tr',x:x,y:y_center},{t:'sc',x:motifSize,y:-motifSize}]); break; case 'f_p11g': addCmd([{t:'tr',x:x,y:y_center},{t:'sc',x:motifSize,y:motifSize}]); addCmd([{t:'tr',x:x+h_spacing/2,y:y_center},{t:'sc',x:motifSize,y:-motifSize}]); break; case 'f_p2mg': addCmd([{t:'tr',x:x,y:y_center},{t:'sc',x:motifSize,y:motifSize}]); addCmd([{t:'tr',x:x+h_spacing/2,y:y_center},{t:'ro',a:180},{t:'sc',x:motifSize,y:motifSize}]); addCmd([{t:'tr',x:x,y:y_center},{t:'sc',x:motifSize,y:-motifSize}]); addCmd([{t:'tr',x:x+h_spacing/2,y:y_center},{t:'ro',a:180},{t:'sc',x:motifSize,y:-motifSize}]); break; case 'f_p2mm': addCmd([{t:'tr',x:x,y:y_center},{t:'sc',x:motifSize,y:motifSize}]); addCmd([{t:'tr',x:x,y:y_center},{t:'sc',x:-motifSize,y:motifSize}]); addCmd([{t:'tr',x:x,y:y_center},{t:'sc',x:motifSize,y:-motifSize}]); addCmd([{t:'tr',x:x,y:y_center},{t:'sc',x:-motifSize,y:-motifSize}]); break; } } return commands; }
+    function calculateWallpaperTransforms(layerState, width, height, symmetry) { const commands = []; const { motifSize, spacing } = layerState; const addCmd = (transformations) => commands.push(transformations); const sx = spacing; const sy = spacing; const hx = Math.sqrt(3) * sx / 2; for (let r = -2; r * sy < height + sy*2; r++) { for (let c = -2; c * sx < width + sx*2; c++) { let x, y; switch(symmetry) { case 'w_p1': x = c*sx + r*sx*0.2; y = r*sy; addCmd([{t:'tr',x:x,y:y},{t:'sc',x:motifSize,y:motifSize}]); break; case 'w_p2': x = c*sx; y = r*sy; addCmd([{t:'tr',x:x,y:y},{t:'sc',x:motifSize,y:motifSize}]); addCmd([{t:'tr',x:x+sx/2,y:y},{t:'ro',a:180},{t:'sc',x:motifSize,y:motifSize}]); addCmd([{t:'tr',x:x,y:y+sy/2},{t:'ro',a:180},{t:'sc',x:motifSize,y:motifSize}]); addCmd([{t:'tr',x:x+sx/2,y:y+sy/2},{t:'ro',a:180},{t:'sc',x:motifSize,y:motifSize}]); break; case 'w_pm': x = c*sx; y = r*sy; addCmd([{t:'tr',x:x,y:y},{t:'sc',x:motifSize,y:motifSize}]); addCmd([{t:'tr',x:x,y:y},{t:'sc',x:-motifSize,y:motifSize}]); break; case 'w_pg': x = c*sx; y = r*sy; addCmd([{t:'tr',x:x,y:y},{t:'sc',x:motifSize,y:motifSize}]); addCmd([{t:'tr',x:x,y:y+sy/2},{t:'sc',x:-motifSize,y:motifSize}]); break; case 'w_cm': x = c*sx + (r%2)*(sx/2); y = r*sy/2; addCmd([{t:'tr',x:x,y:y},{t:'sc',x:motifSize,y:motifSize}]); addCmd([{t:'tr',x:x,y:y},{t:'sc',x:-motifSize,y:motifSize}]); break; case 'w_pmm': x = c*sx; y = r*sy; [0,1].forEach(i=>[0,1].forEach(j=>addCmd([{t:'tr',x:x,y:y},{t:'sc',x:motifSize*(i? -1:1),y:motifSize*(j? -1:1)}]))); break; case 'w_pmg': x=c*sx; y=r*sy; addCmd([{t:'tr',x:x,y:y},{t:'sc',x:motifSize,y:motifSize}]); addCmd([{t:'tr',x:x,y:y},{t:'sc',x:-motifSize,y:motifSize}]); addCmd([{t:'tr',x:x+sx/2,y:y+sy/2},{t:'sc',x:motifSize,y:motifSize}]); addCmd([{t:'tr',x:x+sx/2,y:y+sy/2},{t:'sc',x:-motifSize,y:motifSize}]); break; case 'w_pgg': x=c*sx; y=r*sy; addCmd([{t:'tr',x:x,y:y},{t:'sc',x:motifSize,y:motifSize}]); addCmd([{t:'tr',x:x+sx/2,y:y+sy/2},{t:'ro',a:180},{t:'sc',x:motifSize,y:motifSize}]); break; case 'w_cmm': x = c*sx + (r%2)*(sx/2); y = r*sy/2; [0,1].forEach(i=>[0,1].forEach(j=>addCmd([{t:'tr',x:x,y:y},{t:'sc',x:motifSize*(i?-1:1),y:motifSize*(j?-1:1)}]))); break; case 'w_p4': x = c*sx; y = r*sy; [0,90,180,270].forEach(a=>addCmd([{t:'tr',x:x,y:y},{t:'ro',a:a},{t:'sc',x:motifSize,y:motifSize}])); break; case 'w_p4m': x = c*sx; y = r*sy; [0,90,180,270].forEach(a=>{addCmd([{t:'tr',x:x,y:y},{t:'ro',a:a},{t:'sc',x:motifSize,y:motifSize}]); addCmd([{t:'tr',x:x,y:y},{t:'ro',a:a},{t:'sc',x:-motifSize,y:motifSize}]);}); case 'w_p4g': x=c*sx; y=r*sy; [0,90,180,270].forEach(a=>addCmd([{t:'tr',x:x,y:y},{t:'ro',a:a},{t:'sc',x:motifSize,y:motifSize}])); [0,90,180,270].forEach(a=>addCmd([{t:'tr',x:x+sx/2,y:y+sy/2},{t:'ro',a:a},{t:'sc',x:-motifSize,y:motifSize}])); break; case 'w_p3': x = c*sx + (r%2)*sx/2; y = r*hx; [0,120,240].forEach(a=>addCmd([{t:'tr',x:x,y:y},{t:'ro',a:a},{t:'sc',x:motifSize,y:motifSize}])); break; case 'w_p3m1': x = c*sx + (r%2)*sx/2; y = r*hx; [0,120,240].forEach(a=>{addCmd([{t:'tr',x:x,y:y},{t:'ro',a:a},{t:'sc',x:motifSize,y:motifSize}]); addCmd([{t:'tr',x:x,y:y},{t:'ro',a:a},{t:'sc',x:-motifSize,y:motifSize}]);}); break; case 'w_p31m': x = c*sx+(r%2)*sx/2; y = r*hx; [0,120,240].forEach(a=>addCmd([{t:'tr',x:x,y:y},{t:'ro',a:a},{t:'sc',x:motifSize,y:motifSize}])); [0,120,240].forEach(a=>addCmd([{t:'tr',x:x,y:y},{t:'ro',a:a+60},{t:'sc',x:-motifSize,y:motifSize}])); break; case 'w_p6': x = c*sx + (r%2)*sx/2; y = r*hx; [0,60,120,180,240,300].forEach(a=>addCmd([{t:'tr',x:x,y:y},{t:'ro',a:a},{t:'sc',x:motifSize,y:motifSize}])); break; case 'w_p6m': x = c*sx + (r%2)*sx/2; y = r*hx; [0,60,120,180,240,300].forEach(a=>{addCmd([{t:'tr',x:x,y:y},{t:'ro',a:a},{t:'sc',x:motifSize,y:motifSize}]); addCmd([{t:'tr',x:x,y:y},{t:'ro',a:a},{t:'sc',x:-motifSize,y:motifSize}]);}); break; } } } return commands; }
+    
+    generateBtn.addEventListener('click', handleGenerateClick);
+    downloadBtn.addEventListener('click', () => { const link = document.createElement('a'); link.download = `komposisi_batik.png`; link.href = patternCanvas.toDataURL('image/png'); link.click(); });
+    window.addEventListener('resize', () => { setTimeout(handleGenerateClick, 100); setTimeout(resizeDrawingCanvas, 100);});
+    createLayer('wallpaper'); createLayer('frieze'); setTimeout(handleGenerateClick, 100);
+    
+    // --- DRAWING STUDIO LOGIC ---
+    let isDrawing = false; let lastX = 0; let lastY = 0;
+    let drawingState = { mode: 'rad', brushColor: '#1E3A8A', brushSize: 5, radSectors: 6 };
+
+    // Toggle Tabs
+    stampTabTrigger.addEventListener('click', () => {
+        brushControlsPanel.classList.add('hidden');
+        stampControlsPanel.classList.remove('hidden');
+        stampTabTrigger.classList.add('text-indigo-600', 'border-b-2', 'border-indigo-600');
+        stampTabTrigger.previousElementSibling.classList.remove('text-indigo-600', 'border-b-2', 'border-indigo-600');
+        stampTabTrigger.previousElementSibling.classList.add('text-gray-500');
+        updateStampList();
+    });
+    stampTabTrigger.previousElementSibling.addEventListener('click', () => {
+        stampControlsPanel.classList.add('hidden');
+        brushControlsPanel.classList.remove('hidden');
+        stampTabTrigger.previousElementSibling.classList.add('text-indigo-600', 'border-b-2', 'border-indigo-600');
+        stampTabTrigger.classList.remove('text-indigo-600', 'border-b-2', 'border-indigo-600');
+        stampTabTrigger.classList.add('text-gray-500');
+    });
+
+    function updateStampList() {
+        stampList.innerHTML = '';
+        Object.keys(motifs).forEach(k => {
+            const btn = document.createElement('button');
+            btn.className = 'aspect-square bg-gray-200 rounded hover:ring-2 ring-indigo-500 flex items-center justify-center text-[10px] font-bold text-gray-500';
+            btn.textContent = k.substring(0,3);
+            btn.onclick = () => activateStamp(k, false);
+            stampList.appendChild(btn);
+        });
+        Object.keys(customMotifs).forEach(id => {
+            const m = customMotifs[id];
+            const btn = document.createElement('button');
+            btn.className = 'aspect-square bg-white border rounded hover:ring-2 ring-indigo-500 overflow-hidden';
+            const preview = document.createElement('canvas');
+            preview.width = 40; preview.height = 40;
+            const ptx = preview.getContext('2d');
+            ptx.drawImage(m.canvas, 0,0, 40,40);
+            btn.appendChild(preview);
+            btn.onclick = () => activateStamp(id, true);
+            stampList.appendChild(btn);
+        });
+    }
+
+    function activateStamp(id, isCustom) {
+        activeStampId = id;
+        activeStampContainer.classList.remove('hidden');
+        stampFloatingControls.classList.remove('hidden'); // SHOW FLOATING BAR
+        stampFloatingControls.classList.add('flex'); // Ensure flex is on
+
+        const sCtx = activeStampCanvas.getContext('2d');
+        activeStampCanvas.width = 128; activeStampCanvas.height = 128;
+        sCtx.clearRect(0,0,128,128);
+        sCtx.fillStyle = drawingState.brushColor;
+        if (isCustom) {
+            const motifData = customMotifs[id];
+            const mask = motifData.canvas;
+            
+            if (motifData.isMask) {
+                // Mask mode: Color it
+                sCtx.shadowColor = drawingState.brushColor; sCtx.shadowBlur = 0; sCtx.shadowOffsetX = 1000; sCtx.shadowOffsetY = 0;
+                sCtx.drawImage(mask, -1000, 0, 128, 128);
+            } else {
+                // Original mode: Draw as is
+                sCtx.drawImage(mask, 0, 0, 128, 128);
+            }
+        } else {
+            const p = new Path2D(motifs[id]);
+            sCtx.save();
+            sCtx.translate(64,64);
+            sCtx.fill(p);
+            sCtx.restore();
+        }
+    }
+
+    let isDraggingStamp = false;
+    let stampOffset = {x:0, y:0};
+
+    activeStampContainer.addEventListener('mousedown', startDrag);
+    activeStampContainer.addEventListener('touchstart', startDrag);
+
+    function startDrag(e) {
+        isDraggingStamp = true;
+        const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+        const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+        const rect = activeStampContainer.getBoundingClientRect();
+        stampOffset.x = clientX - rect.left;
+        stampOffset.y = clientY - rect.top;
+        e.preventDefault();
+    }
+
+    window.addEventListener('mousemove', dragStamp);
+    window.addEventListener('touchmove', dragStamp);
+    window.addEventListener('mouseup', () => isDraggingStamp = false);
+    window.addEventListener('touchend', () => isDraggingStamp = false);
+
+    function dragStamp(e) {
+        if(!isDraggingStamp) return;
+        const containerRect = document.getElementById('drawing-container').getBoundingClientRect();
+        const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+        const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+        let x = clientX - containerRect.left - stampOffset.x;
+        let y = clientY - containerRect.top - stampOffset.y;
+        activeStampContainer.style.left = `${x}px`;
+        activeStampContainer.style.top = `${y}px`;
+    }
+
+    stampCancelBtn.onclick = () => {
+        activeStampContainer.classList.add('hidden');
+        stampFloatingControls.classList.add('hidden');
+    };
+    
+    stampApplyBtn.onclick = () => {
+        const rect = activeStampContainer.getBoundingClientRect();
+        const containerRect = document.getElementById('drawing-container').getBoundingClientRect();
+        const dpr = window.devicePixelRatio || 1;
+        const x = rect.left - containerRect.left;
+        const y = rect.top - containerRect.top;
+        const cx = x * (drawingCanvas.width / containerRect.width);
+        const cy = y * (drawingCanvas.height / containerRect.height);
+        const cw = rect.width * (drawingCanvas.width / containerRect.width);
+        const ch = rect.height * (drawingCanvas.height / containerRect.height);
+        dtx.drawImage(activeStampCanvas, cx, cy, cw, ch);
+        activeStampContainer.classList.add('hidden');
+        stampFloatingControls.classList.add('hidden');
+    };
+
+    function resizeDrawingCanvas() {
+        if (drawingSection.classList.contains('hidden')) return;
+        const dpr = window.devicePixelRatio || 1;
+        const container = drawingCanvas.parentElement;
+        drawingCanvas.width = container.clientWidth * dpr;
+        drawingCanvas.height = (parseInt(drawingCanvas.style.height) || container.clientHeight) * dpr;
+        dtx.scale(dpr, dpr);
+        clearDrawingCanvas();
+    }
+    function clearDrawingCanvas() {
+        dtx.fillStyle = '#FFFFFF';
+        dtx.fillRect(0, 0, drawingCanvas.width, drawingCanvas.height);
+    }
+    function getMousePos(e) {
+        const rect = drawingCanvas.getBoundingClientRect();
+        const scaleX = drawingCanvas.width / (rect.width * (window.devicePixelRatio || 1));
+        const scaleY = drawingCanvas.height / (rect.height * (window.devicePixelRatio || 1));
+        const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+        const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+        return { x: (clientX - rect.left) * scaleX, y: (clientY - rect.top) * scaleY };
+    }
+    function draw(x, y, fromX, fromY) {
+        dtx.lineCap = 'round'; dtx.lineJoin = 'round';
+        dtx.strokeStyle = drawingState.brushColor;
+        dtx.lineWidth = drawingState.brushSize;
+        dtx.beginPath(); dtx.moveTo(fromX, fromY); dtx.lineTo(x, y); dtx.stroke();
+    }
+    function handleDraw(e) {
+        if (!isDrawing) return;
+        e.preventDefault();
+        const { x, y } = getMousePos(e);
+        const [w, h] = [drawingCanvas.width / (window.devicePixelRatio || 1), drawingCanvas.height / (window.devicePixelRatio || 1)];
+        const drawSymmetric = (newX, newY, newFromX, newFromY) => {
+            switch(drawingState.mode) {
+                case 'ver': draw(newX, newY, newFromX, newFromY); draw(w - newX, newY, w - newFromX, newFromY); break;
+                case 'hor': draw(newX, newY, newFromX, newFromY); draw(newX, h - newY, newFromX, h - newFromY); break;
+                case 'quad': draw(newX, newY, newFromX, newFromY); draw(w - newX, newY, w - newFromX, newFromY); draw(newX, h - newY, newFromX, h - newFromY); draw(w - newX, h - newY, w - newFromX, h - newFromY); break;
+                case 'rad':
+                    const [cx, cy] = [w/2, h/2];
+                    const angle = (Math.PI * 2) / drawingState.radSectors;
+                    for (let i = 0; i < drawingState.radSectors; i++) {
+                        dtx.save();
+                        dtx.translate(cx, cy); dtx.rotate(angle * i); dtx.translate(-cx, -cy);
+                        draw(newX, newY, newFromX, newFromY);
+                        dtx.restore();
+                    }
+                    break;
+                default: draw(newX, newY, newFromX, newFromY);
+            }
+        }
+        drawSymmetric(x, y, lastX, lastY);
+        [lastX, lastY] = [x, y];
+    }
+    drawingCanvas.addEventListener('mousedown', (e) => { isDrawing = true; const { x, y } = getMousePos(e); [lastX, lastY] = [x, y]; });
+    drawingCanvas.addEventListener('mousemove', handleDraw);
+    drawingCanvas.addEventListener('mouseup', () => isDrawing = false);
+    drawingCanvas.addEventListener('mouseout', () => isDrawing = false);
+    drawingCanvas.addEventListener('touchstart', (e) => { isDrawing = true; const { x, y } = getMousePos(e); [lastX, lastY] = [x, y]; });
+    drawingCanvas.addEventListener('touchmove', handleDraw);
+    drawingCanvas.addEventListener('touchend', () => isDrawing = false);
+    drawingTools.forEach(tool => {
+        tool.addEventListener('click', () => {
+            drawingTools.forEach(t => t.classList.remove('active'));
+            tool.classList.add('active');
+            drawingState.mode = tool.dataset.mode;
+            radialControl.style.display = drawingState.mode === 'rad' ? 'block' : 'none';
+        });
+    });
+    brushColorPicker.addEventListener('input', (e) => { 
+        drawingState.brushColor = e.target.value; 
+        if(!activeStampContainer.classList.contains('hidden')) activateStamp(activeStampId, customMotifs[activeStampId]); // Update stamp color live
+    });
+    brushSizeSlider.addEventListener('input', (e) => { drawingState.brushSize = e.target.value; brushSizeVal.textContent = e.target.value; });
+    radMinus.addEventListener('click', () => { if(drawingState.radSectors > 2) { drawingState.radSectors--; radCount.textContent = drawingState.radSectors; } });
+    radPlus.addEventListener('click', () => { if(drawingState.radSectors < 20) { drawingState.radSectors++; radCount.textContent = drawingState.radSectors; } });
+    resetDrawingBtn.addEventListener('click', clearDrawingCanvas);
+    downloadDrawingBtn.addEventListener('click', () => { const link = document.createElement('a'); link.download = `motif_kustom.png`; link.href = drawingCanvas.toDataURL('image/png'); link.click(); });
+
+    // Mockup 3D
+    let scene, camera, renderer, animationId, mockupGroup;
+    let mockupMode = 'cloth'; // cloth, totebag, custom
+    let customModelUrl = null;
+    let isDragging3D = false, prevMouseX = 0;
+
+    mockupSelect.addEventListener('change', (e) => {
+        mockupMode = e.target.value;
+        if(mockupMode === 'cloth') { windControl.classList.remove('hidden'); mockupUploadContainer.classList.add('hidden'); }
+        else if (mockupMode === 'custom') { windControl.classList.add('hidden'); mockupUploadContainer.classList.remove('hidden'); }
+        else { windControl.classList.add('hidden'); mockupUploadContainer.classList.add('hidden'); }
+        updateMockup();
+    });
+
+    mockupUploadInput.addEventListener('change', (e) => {
+        const file = e.target.files[0];
+        if (file) { customModelUrl = URL.createObjectURL(file); updateMockup(); }
+    });
+
+    updateMockupBtn.addEventListener('click', () => { handleGenerateClick(); updateMockup(); });
+
+    function updateMockup() {
+        mockupLoading.classList.remove('hidden');
+        if(renderer && renderer.domElement.parentNode) renderer.domElement.parentNode.removeChild(renderer.domElement);
+        if(animationId) cancelAnimationFrame(animationId);
+        setTimeout(() => { init3DScene(mockupMode); mockupLoading.classList.add('hidden'); }, 100);
+    }
+
+    function init3DScene(mode) {
+        const texData = patternCanvas.toDataURL();
+        const loader = new THREE.TextureLoader();
+        const texture = loader.load(texData);
+        texture.wrapS = THREE.RepeatWrapping; texture.wrapT = THREE.RepeatWrapping;
+        const repeatVal = parseInt(patternScaleSlider.value); texture.repeat.set(repeatVal, repeatVal);
+        texture.flipY = false;
+
+        const container = document.getElementById('mockup-container');
+        const w = container.clientWidth; const h = container.clientHeight;
+        scene = new THREE.Scene(); scene.background = new THREE.Color(0x111827);
+        camera = new THREE.PerspectiveCamera(45, w/h, 0.1, 1000);
+        camera.position.set(0, 2, 20); camera.lookAt(0,0,0);
+        renderer = new THREE.WebGLRenderer({ antialias: true }); renderer.setSize(w, h);
+        container.appendChild(renderer.domElement);
+
+        const ambientLight = new THREE.AmbientLight(0xffffff, 0.5); scene.add(ambientLight);
+        const dirLight = new THREE.DirectionalLight(0xffffff, 1.2); dirLight.position.set(5, 10, 7.5); scene.add(dirLight);
+        
+        mockupGroup = new THREE.Group();
+        const material = new THREE.MeshStandardMaterial({ map: texture, side: THREE.DoubleSide, roughness: 0.6, metalness: 0.1 });
+
+        if (mode === 'cloth') {
+            texture.flipY = true;
+            const geometry = new THREE.PlaneGeometry(10, 10, 30, 30);
+            const cloth = new THREE.Mesh(geometry, material);
+            mockupGroup.add(cloth);
+            scene.add(mockupGroup);
+            startAnimationLoop(mode);
+        } else if (mode === 'totebag') {
+            texture.flipY = true;
+            const bagGeo = new THREE.BoxGeometry(8, 10, 1.5);
+            const bag = new THREE.Mesh(bagGeo, material);
+            const handleGeo = new THREE.TorusGeometry(2.5, 0.2, 8, 20, Math.PI);
+            const handleMat = new THREE.MeshStandardMaterial({ color: 0x333333 });
+            const handle = new THREE.Mesh(handleGeo, handleMat);
+            handle.position.set(0, 5, 0);
+            mockupGroup.add(bag); mockupGroup.add(handle);
+            scene.add(mockupGroup);
+            startAnimationLoop(mode);
+        } else if (mode === 'custom') {
+            if (customModelUrl) {
+                const loader = new GLTFLoader();
+                loader.load(customModelUrl, (gltf) => {
+                    const model = gltf.scene;
+                    const box = new THREE.Box3().setFromObject(model);
+                    const size = box.getSize(new THREE.Vector3());
+                    const maxDim = Math.max(size.x, size.y, size.z);
+                    const scale = 10 / maxDim;
+                    model.scale.set(scale, scale, scale);
+                    box.setFromObject(model);
+                    const center = box.getCenter(new THREE.Vector3());
+                    model.position.sub(center);
+                    model.traverse((child) => {
+                        if (child.isMesh) {
+                            const oldMat = child.material;
+                            child.material = new THREE.MeshStandardMaterial({
+                                map: texture, roughness: oldMat.roughness ?? 0.6, metalness: oldMat.metalness ?? 0.1, skinning: true
+                            });
+                        }
+                    });
+                    mockupGroup.add(model); scene.add(mockupGroup); startAnimationLoop(mode);
+                }, undefined, (e) => { console.error(e); alert("Gagal memuat model."); mockupLoading.classList.add('hidden'); });
+            } else { alert("Silakan unggah .glb!"); mockupLoading.classList.add('hidden'); }
+        }
+    }
+
+    function startAnimationLoop(mode) {
+        renderer.domElement.addEventListener('mousedown', (e) => { isDragging3D = true; prevMouseX = e.clientX; });
+        window.addEventListener('mouseup', () => isDragging3D = false);
+        window.addEventListener('mousemove', (e) => {
+            if(isDragging3D && mockupGroup) { const deltaX = e.clientX - prevMouseX; mockupGroup.rotation.y += deltaX * 0.01; prevMouseX = e.clientX; }
+        });
+        const clock = new THREE.Clock();
+        const animate = () => {
+            animationId = requestAnimationFrame(animate);
+            const t = clock.getElapsedTime();
+            if (mode === 'cloth' && mockupGroup.children[0]) {
+                const mesh = mockupGroup.children[0];
+                const wind = parseInt(windSpeedSlider.value) / 3;
+                const pos = mesh.geometry.attributes.position;
+                for ( let i = 0; i < pos.count; i ++ ) {
+                    const x = pos.getX( i ); const y = pos.getY( i );
+                    const z = Math.sin(x * 0.5 + t * wind) * 0.5 * Math.sin(y * 0.5 + t);
+                    pos.setZ( i, z );
+                }
+                pos.needsUpdate = true; mesh.geometry.computeVertexNormals();
+            } else { if (!isDragging3D && mockupGroup) mockupGroup.rotation.y += 0.002; }
+            renderer.render(scene, camera);
+        };
+        animate();
+    }
+
+    setTimeout(resizeDrawingCanvas, 100);
+</script>
+
+</body>
+</html>
